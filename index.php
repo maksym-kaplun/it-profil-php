@@ -14,5 +14,9 @@ if (!$data) {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    </body>
+    <header>
+        <h1><?php echo htmlspecialchars($data['name']); ?></h1>
+        <p><?php echo htmlspecialchars($data['role']); ?></p>
+    </header>
+</body>
 </html>
