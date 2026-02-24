@@ -26,5 +26,13 @@ if (!$data) {
                 <?php endforeach; ?>
             </ul>
     </section>
+    <section>
+        <h2>Zájmy</h2>
+        <div>
+            <?php foreach ($data['interests'] as $interest): ?>
+                <span class="tag"><?php echo htmlspecialchars($interest); ?></span>
+            <?php endforeach; ?>
+        </div>
+    </section>
 </body>
 </html>
