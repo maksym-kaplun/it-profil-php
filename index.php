@@ -18,5 +18,13 @@ if (!$data) {
         <h1><?php echo htmlspecialchars($data['name']); ?></h1>
         <p><?php echo htmlspecialchars($data['role']); ?></p>
     </header>
+    <section>
+            <h2>Dovednosti</h2>
+            <ul>
+                <?php foreach ($data['skills'] as $skill): ?>
+                    <li><?php echo htmlspecialchars($skill); ?></li>
+                <?php endforeach; ?>
+            </ul>
+    </section>
 </body>
 </html>
