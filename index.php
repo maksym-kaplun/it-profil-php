@@ -33,6 +33,18 @@ if (!$data) {
                 <span class="tag"><?php echo htmlspecialchars($interest); ?></span>
             <?php endforeach; ?>
         </div>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+        
+        <?php if (!empty($message)): ?>
+            <p class="<?php echo $messageType; ?>">
+                <?php echo htmlspecialchars($message); ?>
+            </p>
+        <?php endif; ?>
+
+        <form method="POST">
+            <input type="text" name="new_interest" required placeholder="Napiš nový zájem...">
+            <button type="submit">Přidat zájem</button>
+        </form>
     </section>
 </body>
 </html>
