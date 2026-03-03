@@ -1,9 +1,44 @@
 <?php
-$json_data = file_get_contents('profile.json');
+$filename = 'profile.json';
+$message = '';
+$messageType = '';
+
+$json_data = file_get_contents($filename);
 $data = json_decode($json_data, true);
 
 if (!$data) {
     die('Chyba: Nepodařilo se načíst profile.json');
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_interest'])) {
+    $new_interest = trim($_POST['new_interest']);
+
+    if (empty($new_interest)) {
+        $message = "Pole nesmí být prázdné.";
+        $messageType = "error";
+    } else {
+ 
+        $is_duplicate = false;
+        foreach ($data['interests'] as $existing_interest) {
+            if (strtolower($existing_interest) === strtolower($new_interest)) {
+                $is_duplicate = true;
+                break;
+            }
+        }
+
+        if ($is_duplicate) {
+            $message = "Tento zájem už existuje.";
+            $messageType = "error";
+        } else {
+
+            $data['interests'][] = $new_interest;
+            
+            file_put_contents($filename, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            
+            $message = "Zájem byl úspěšně přidán.";
+            $messageType = "success";
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
