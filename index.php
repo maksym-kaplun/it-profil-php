@@ -1,10 +1,7 @@
 <?php
-// 1. Start session pro přenos hlášek po přesměrování
 session_start();
 
 $filename = 'profile.json';
-
-// Načtení dat ze souboru
 $json_data = file_get_contents($filename);
 $data = json_decode($json_data, true);
 
@@ -12,24 +9,37 @@ if (!$data) {
     die('Chyba: Nepodařilo se načíst profile.json');
 }
 
-// 2. Načtení hlášek ze session a jejich okamžité smazání (aby se neukázaly znovu)
+// Načtení hlášek ze session
 $message = $_SESSION['message'] ?? '';
 $messageType = $_SESSION['messageType'] ?? '';
-unset($_SESSION['message']);
-unset($_SESSION['messageType']);
+unset($_SESSION['message'], $_SESSION['messageType']);
 
-// --- LOGIKA PŘIDÁVÁNÍ (POST) - PRG PATTERN ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_interest'])) {
-    $new_interest = trim($_POST['new_interest']);
+// --- LOGIKA MAZÁNÍ (DELETE) ---
+if (isset($_GET['delete'])) {
+    $index = (int)$_GET['delete'];
+    if (isset($data['interests'][$index])) {
+        array_splice($data['interests'], $index, 1); // Odstraní prvek a přečísluje pole
+        file_put_contents($filename, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $_SESSION['message'] = "Zájem byl odstraněn.";
+        $_SESSION['messageType'] = "success";
+    }
+    header("Location: index.php");
+    exit;
+}
 
-    if (empty($new_interest)) {
+// --- LOGIKA PŘIDÁVÁNÍ A EDITACE (POST) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['interest_value'])) {
+    $value = trim($_POST['interest_value']);
+    $edit_index = isset($_POST['edit_index']) ? (int)$_POST['edit_index'] : -1;
+
+    if (empty($value)) {
         $_SESSION['message'] = "Pole nesmí být prázdné.";
         $_SESSION['messageType'] = "error";
     } else {
-        // Kontrola duplicity (case-insensitive)
+        // Kontrola duplicity (vynecháme aktuálně editovaný prvek)
         $is_duplicate = false;
-        foreach ($data['interests'] as $existing_interest) {
-            if (strtolower($existing_interest) === strtolower($new_interest)) {
+        foreach ($data['interests'] as $idx => $existing) {
+            if (strtolower($existing) === strtolower($value) && $idx !== $edit_index) {
                 $is_duplicate = true;
                 break;
             }
@@ -39,26 +49,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_interest'])) {
             $_SESSION['message'] = "Tento zájem už existuje.";
             $_SESSION['messageType'] = "error";
         } else {
-            // Přidání do pole a uložení do JSON
-            $data['interests'][] = $new_interest;
+            if ($edit_index !== -1) {
+                // EDITACE
+                $data['interests'][$edit_index] = $value;
+                $_SESSION['message'] = "Zájem byl upraven.";
+            } else {
+                // PŘIDÁVÁNÍ
+                $data['interests'][] = $value;
+                $_SESSION['message'] = "Zájem byl úspěšně přidán.";
+            }
             file_put_contents($filename, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-            
-            $_SESSION['message'] = "Zájem byl úspěšně přidán.";
             $_SESSION['messageType'] = "success";
         }
     }
-
-    // PŘESMĚROVÁNÍ (Klíčová část PRG patternu)
     header("Location: index.php");
-    exit; 
+    exit;
+}
+
+// Příprava pro editační formulář
+$edit_mode = false;
+$edit_val = "";
+if (isset($_GET['edit'])) {
+    $idx = (int)$_GET['edit'];
+    if (isset($data['interests'][$idx])) {
+        $edit_mode = true;
+        $edit_val = $data['interests'][$idx];
+        $current_edit_index = $idx;
+    }
 }
 ?>
 <!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Můj PHP Profil</title>
+    <title>Můj PHP Profil 5.0</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .actions { margin-left: 10px; font-size: 0.8em; }
+        .actions a { text-decoration: none; margin-right: 5px; }
+        .btn-delete { color: #e74c3c; }
+        .btn-edit { color: #f39c12; }
+        .tag { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    </style>
 </head>
 <body>
     <header>
@@ -67,33 +99,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_interest'])) {
     </header>
 
     <section>
-        <h2>Dovednosti</h2>
-        <ul>
-            <?php foreach ($data['skills'] as $skill): ?>
-                <li><?php echo htmlspecialchars($skill); ?></li>
-            <?php endforeach; ?>
-        </ul>
-    </section>
-
-    <section>
-        <h2>Zájmy</h2>
+        <h2>Zájmy (CRUD)</h2>
         <div class="interests-list">
-            <?php foreach ($data['interests'] as $interest): ?>
-                <span class="tag"><?php echo htmlspecialchars($interest); ?></span>
+            <?php foreach ($data['interests'] as $index => $interest): ?>
+                <div class="tag">
+                    <span><?php echo htmlspecialchars($interest); ?></span>
+                    <div class="actions">
+                        <a href="?edit=<?php echo $index; ?>" class="btn-edit">Upravit</a>
+                        <a href="?delete=<?php echo $index; ?>" class="btn-delete" onclick="return confirm('Opravdu smazat?')">Smazat</a>
+                    </div>
+                </div>
             <?php endforeach; ?>
         </div>
 
         <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
         
         <?php if (!empty($message)): ?>
-            <p class="<?php echo $messageType; ?>">
-                <?php echo htmlspecialchars($message); ?>
-            </p>
+            <p class="<?php echo $messageType; ?>"><?php echo htmlspecialchars($message); ?></p>
         <?php endif; ?>
 
         <form method="POST">
-            <input type="text" name="new_interest" required placeholder="Napiš nový zájem...">
-            <button type="submit">Přidat zájem</button>
+            <h3><?php echo $edit_mode ? "Upravit zájem" : "Přidat nový zájem"; ?></h3>
+            <input type="text" name="interest_value" required value="<?php echo htmlspecialchars($edit_val); ?>">
+            
+            <?php if ($edit_mode): ?>
+                <input type="hidden" name="edit_index" value="<?php echo $current_edit_index; ?>">
+            <?php endif; ?>
+
+            <button type="submit"><?php echo $edit_mode ? "Uložit změny" : "Přidat"; ?></button>
+            <?php if ($edit_mode): ?>
+                <a href="index.php">Zrušit</a>
+            <?php endif; ?>
         </form>
     </section>
 </body>
