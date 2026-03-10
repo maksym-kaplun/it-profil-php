@@ -1,85 +1,85 @@
 <?php
-// 1. Musí být úplně první věc
+// 1. Start session - musí být úplně první
 session_start();
 
 $filename = 'profile.json';
 
-// Načtení a kontrola souboru
+// Načtení dat a základní kontrola
 if (!file_exists($filename)) {
-    die("Chyba: Soubor profile.json neexistuje ve stejné složce jako index.php!");
+    die("Chyba: Soubor profile.json nebyl nalezen!");
 }
 
-$json_data = file_get_contents($filename);
-$data = json_decode($json_data, true);
+$json_content = file_get_contents($filename);
+$data = json_decode($json_content, true);
 
-// Pokud se JSON nepodařilo přečíst (např. chyba v syntaxi)
 if ($data === null) {
-    die("Chyba: profile.json má špatný formát. Zkontroluj uvozovky a čárky v JSONu.");
+    die("Chyba: profile.json má poškozený formát (zkontroluj čárky a uvozovky).");
 }
 
-// Načtení hlášek ze session
-$message = $_SESSION['message'] ?? '';
-$messageType = $_SESSION['messageType'] ?? '';
-unset($_SESSION['message'], $_SESSION['messageType']);
+// Načtení hlášek ze session a jejich smazání
+$message = $_SESSION['msg'] ?? '';
+$messageType = $_SESSION['type'] ?? '';
+unset($_SESSION['msg'], $_SESSION['type']);
 
-// --- MAZÁNÍ ---
+// --- LOGIKA: MAZÁNÍ (DELETE) ---
 if (isset($_GET['delete'])) {
-    $index = (int)$_GET['delete'];
-    if (isset($data['interests'][$index])) {
-        array_splice($data['interests'], $index, 1);
+    $id = (int)$_GET['delete'];
+    if (isset($data['interests'][$id])) {
+        array_splice($data['interests'], $id, 1);
         file_put_contents($filename, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        $_SESSION['message'] = "Zájem byl odstraněn.";
-        $_SESSION['messageType'] = "success";
+        $_SESSION['msg'] = "Zájem byl smazán.";
+        $_SESSION['type'] = "success";
     }
     header("Location: index.php");
     exit;
 }
 
-// --- PŘIDÁVÁNÍ A EDITACE (POST) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['interest_value'])) {
-    $value = trim($_POST['interest_value']);
-    $edit_index = isset($_POST['edit_index']) ? (int)$_POST['edit_index'] : -1;
+// --- LOGIKA: PŘIDÁVÁNÍ A EDITACE (POST + PRG) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['interest_text'])) {
+    $text = trim($_POST['interest_text']);
+    $edit_id = isset($_POST['edit_id']) ? (int)$_POST['edit_id'] : -1;
 
-    if (empty($value)) {
-        $_SESSION['message'] = "Pole nesmí být prázdné.";
-        $_SESSION['messageType'] = "error";
+    if (empty($text)) {
+        $_SESSION['msg'] = "Pole nesmí být prázdné.";
+        $_SESSION['type'] = "error";
     } else {
+        // Kontrola duplicity (ignoruje aktuálně editovaný prvek)
         $is_duplicate = false;
-        foreach ($data['interests'] as $idx => $existing) {
-            if (strtolower($existing) === strtolower($value) && $idx !== $edit_index) {
+        foreach ($data['interests'] as $idx => $val) {
+            if (strtolower($val) === strtolower($text) && $idx !== $edit_id) {
                 $is_duplicate = true;
                 break;
             }
         }
 
         if ($is_duplicate) {
-            $_SESSION['message'] = "Tento zájem už existuje.";
-            $_SESSION['messageType'] = "error";
+            $_SESSION['msg'] = "Tento zájem už v seznamu je.";
+            $_SESSION['type'] = "error";
         } else {
-            if ($edit_index !== -1) {
-                $data['interests'][$edit_index] = $value;
-                $_SESSION['message'] = "Zájem byl upraven.";
+            if ($edit_id >= 0) {
+                $data['interests'][$edit_id] = $text;
+                $_SESSION['msg'] = "Zájem byl upraven.";
             } else {
-                $data['interests'][] = $value;
-                $_SESSION['message'] = "Zájem byl přidán.";
+                $data['interests'][] = $text;
+                $_SESSION['msg'] = "Zájem byl přidán.";
             }
             file_put_contents($filename, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-            $_SESSION['messageType'] = "success";
+            $_SESSION['type'] = "success";
         }
     }
     header("Location: index.php");
     exit;
 }
 
-// Příprava na editaci
+// Příprava na editaci (naplnění formuláře)
 $edit_mode = false;
 $edit_val = "";
 if (isset($_GET['edit'])) {
-    $idx = (int)$_GET['edit'];
-    if (isset($data['interests'][$idx])) {
+    $id = (int)$_GET['edit'];
+    if (isset($data['interests'][$id])) {
         $edit_mode = true;
-        $edit_val = $data['interests'][$idx];
-        $current_edit_index = $idx;
+        $edit_val = $data['interests'][$id];
+        $current_id = $id;
     }
 }
 ?>
@@ -87,46 +87,46 @@ if (isset($_GET['edit'])) {
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Profil 5.0 - Opraveno</title>
+    <title>IT Profil 5.0</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1><?php echo htmlspecialchars($data['name'] ?? 'Jméno nenalezeno'); ?></h1>
-        <p><?php echo htmlspecialchars($data['role'] ?? 'Role nenalezena'); ?></p>
-    </header>
+    <div style="max-width: 600px; margin: auto; padding: 20px;">
+        <h1><?php echo htmlspecialchars($data['name']); ?></h1>
+        <p><strong>Pozice:</strong> <?php echo htmlspecialchars($data['role']); ?></p>
 
-    <section>
-        <h2>Zájmy</h2>
+        <h3>Moje zájmy:</h3>
         <ul>
-            <?php if (!empty($data['interests'])): ?>
-                <?php foreach ($data['interests'] as $index => $interest): ?>
-                    <li>
-                        <?php echo htmlspecialchars($interest); ?>
-                        <a href="?edit=<?php echo $index; ?>" style="color:orange; margin-left:10px;">[Upravit]</a>
-                        <a href="?delete=<?php echo $index; ?>" style="color:red; margin-left:10px;" onclick="return confirm('Opravdu smazat?')">[Smazat]</a>
-                    </li>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <p>Žádné zájmy k zobrazení.</p>
-            <?php endif; ?>
+            <?php foreach ($data['interests'] as $index => $interest): ?>
+                <li style="margin-bottom: 10px;">
+                    <?php echo htmlspecialchars($interest); ?> 
+                    <a href="?edit=<?php echo $index; ?>" style="color: blue; margin-left: 10px;">[Upravit]</a>
+                    <a href="?delete=<?php echo $index; ?>" style="color: red; margin-left: 5px;" onclick="return confirm('Smazat?')">[Smazat]</a>
+                </li>
+            <?php endforeach; ?>
         </ul>
 
+        <hr>
+
         <?php if ($message): ?>
-            <p class="<?php echo $messageType; ?>" style="padding:10px; border:1px solid;"><?php echo $message; ?></p>
+            <div class="<?php echo $messageType; ?>" style="padding: 10px; margin-bottom: 10px; border: 1px solid;">
+                <?php echo htmlspecialchars($message); ?>
+            </div>
         <?php endif; ?>
 
-        <form method="POST" style="margin-top:20px; background:#eee; padding:15px;">
-            <h3><?php echo $edit_mode ? "Upravit zájem" : "Přidat zájem"; ?></h3>
-            <input type="text" name="interest_value" value="<?php echo htmlspecialchars($edit_val); ?>" required>
+        <form method="POST" style="background: #f4f4f4; padding: 15px;">
+            <h4><?php echo $edit_mode ? "Upravit zájem" : "Přidat nový zájem"; ?></h4>
+            <input type="text" name="interest_text" value="<?php echo htmlspecialchars($edit_val); ?>" required>
             
             <?php if ($edit_mode): ?>
-                <input type="hidden" name="edit_index" value="<?php echo $current_edit_index; ?>">
+                <input type="hidden" name="edit_id" value="<?php echo $current_id; ?>">
             <?php endif; ?>
 
             <button type="submit"><?php echo $edit_mode ? "Uložit změny" : "Přidat"; ?></button>
-            <?php if ($edit_mode): ?><a href="index.php">Zrušit</a><?php endif; ?>
+            <?php if ($edit_mode): ?>
+                <a href="index.php">Zrušit</a>
+            <?php endif; ?>
         </form>
-    </section>
+    </div>
 </body>
 </html>
