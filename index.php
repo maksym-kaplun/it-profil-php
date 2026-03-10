@@ -1,4 +1,21 @@
 <?php
+session_start();
+
+$filename = 'profile.json';
+
+$json_data = file_get_contents($filename);
+$data = json_decode($json_data, true);
+
+if (!$data) {
+    die('Chyba: Nepodařilo se načíst profile.json');
+}
+
+$message = $_SESSION['message'] ?? '';
+$messageType = $_SESSION['messageType'] ?? '';
+
+unset($_SESSION['message']);
+unset($_SESSION['messageType']);
+
 $filename = 'profile.json';
 $message = '';
 $messageType = '';
